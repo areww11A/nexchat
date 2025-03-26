@@ -103,4 +103,68 @@ router.get('/:id/messages', async (req, res) => {
   }
 });
 
+// Создание группового чата
+router.post('/group', async (req, res) => {
+  const { creatorId, name, members } = req.body;
+
+  // Валидация входных данных
+  if (!creatorId || !name || !Array.isArray(members)) {
+    return res.status(400).json({ error: 'Неверные входные данные' });
+  }
+
+  try {
+    // Проверка существования создателя
+    const creatorExists = await db.get(
+      'SELECT id FROM users WHERE id = ?',
+      [creatorId]
+    );
+    
+    if (!creatorExists) {
+      return res.status(404).json({ error: 'Создатель не найден' });
+    }
+
+    // Проверка существования участников
+    const memberIds = members.map(m => m.userId);
+    const usersExist = await db.get(
+      'SELECT COUNT(*) as count FROM users WHERE id IN (' + 
+      memberIds.map(() => '?').join(',') + ')',
+      memberIds
+    );
+    
+    if (usersExist.count !== memberIds.length) {
+      return res.status(404).json({ error: 'Один из участников не найден' });
+    }
+
+    // Создание группового чата
+    const chatResult = await db.run(
+      'INSERT INTO chats (type, name) VALUES (?, ?)',
+      ['group', name]
+    );
+
+    // Добавление создателя как админа
+    await db.run(
+      'INSERT INTO chat_members (chatId, userId, role) VALUES (?, ?, ?)',
+      [chatResult.lastID, creatorId, 'admin']
+    );
+
+    // Добавление участников
+    for (const member of members) {
+      await db.run(
+        'INSERT INTO chat_members (chatId, userId, role) VALUES (?, ?, ?)',
+        [chatResult.lastID, member.userId, member.role || 'member']
+      );
+    }
+
+    res.status(201).json({ 
+      chatId: chatResult.lastID,
+      name,
+      type: 'group'
+    });
+
+  } catch (error) {
+    console.error('Ошибка создания группового чата:', error);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
 export default router;

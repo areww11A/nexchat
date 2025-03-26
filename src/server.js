@@ -36,6 +36,7 @@ await db.exec(`
   CREATE TABLE IF NOT EXISTS chats (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     type TEXT CHECK(type IN ('personal', 'group')) NOT NULL,
+    name TEXT,
     createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 

@@ -13,6 +13,74 @@ describe('Checkpoint Tests', () => {
     try { await fs.unlink(progressFile); } catch {}
   });
 
+  describe('Group Chat API', () => {
+    let creatorId, member1Id, member2Id;
+
+    beforeAll(async () => {
+      // Create test users
+      await db.run('DELETE FROM users');
+      
+      const creator = await db.run(
+        'INSERT INTO users (username, passwordHash, publicKey, privateKey) VALUES (?, ?, ?, ?)',
+        ['creator', 'hash1', 'pubkey1', 'privkey1']
+      );
+      creatorId = creator.lastID;
+
+      const member1 = await db.run(
+        'INSERT INTO users (username, passwordHash, publicKey, privateKey) VALUES (?, ?, ?, ?)',
+        ['member1', 'hash2', 'pubkey2', 'privkey2']
+      );
+      member1Id = member1.lastID;
+
+      const member2 = await db.run(
+        'INSERT INTO users (username, passwordHash, publicKey, privateKey) VALUES (?, ?, ?, ?)',
+        ['member2', 'hash3', 'pubkey3', 'privkey3']
+      );
+      member2Id = member2.lastID;
+    });
+
+    it('POST /api/chat/group - should create group chat', async () => {
+      const res = await request(server)
+        .post('/api/chat/group')
+        .send({
+          creatorId,
+          name: 'Test Group',
+          members: [
+            {userId: member1Id, role: 'member'},
+            {userId: member2Id, role: 'member'}
+          ]
+        });
+
+      expect(res.statusCode).toBe(201);
+      expect(res.body).toHaveProperty('chatId');
+      expect(res.body).toHaveProperty('name', 'Test Group');
+    });
+
+    it('POST /api/chat/group - should return 400 for invalid input', async () => {
+      const res = await request(server)
+        .post('/api/chat/group')
+        .send({
+          // Missing creatorId
+          name: 'Invalid Group',
+          members: []
+        });
+
+      expect(res.statusCode).toBe(400);
+    });
+
+    it('POST /api/chat/group - should return 404 for non-existent users', async () => {
+      const res = await request(server)
+        .post('/api/chat/group')
+        .send({
+          creatorId: 999,
+          name: 'Invalid Group',
+          members: []
+        });
+
+      expect(res.statusCode).toBe(404);
+    });
+  });
+
   afterEach(async () => {
     await fs.writeFile(progressFile, JSON.stringify(testResults, null, 2));
   });
