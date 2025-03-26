@@ -73,6 +73,15 @@ await db.exec(`
     fileUrl TEXT NOT NULL,
     FOREIGN KEY(ownerId) REFERENCES users(id)
   );
+
+  CREATE TABLE IF NOT EXISTS pinned_messages (
+    chatId INTEGER NOT NULL,
+    messageId INTEGER NOT NULL,
+    pinnedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(chatId) REFERENCES chats(id),
+    FOREIGN KEY(messageId) REFERENCES messages(id),
+    PRIMARY KEY (chatId, messageId)
+  );
 `);
 
 // WebSocket сервер

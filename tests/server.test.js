@@ -13,6 +13,169 @@ describe('Checkpoint Tests', () => {
     try { await fs.unlink(progressFile); } catch {}
   });
 
+  describe('Group Chat Moderation', () => {
+    let groupChatId, adminId, memberId, messageId, creatorId, member1Id;
+
+    beforeAll(async () => {
+      // Create test group
+      await db.run('DELETE FROM chats');
+      await db.run('DELETE FROM chat_members');
+      
+      const chatRes = await db.run(
+        'INSERT INTO chats (type, name) VALUES (?, ?)',
+        ['group', 'Mod Test Group']
+      );
+      groupChatId = chatRes.lastID;
+
+      const admin = await db.run(
+        'INSERT INTO users (username, passwordHash, publicKey, privateKey) VALUES (?, ?, ?, ?)',
+        ['admin', 'hash', 'pubkey1', 'privkey1']
+      );
+      adminId = admin.lastID;
+
+      const member = await db.run(
+        'INSERT INTO users (username, passwordHash, publicKey, privateKey) VALUES (?, ?, ?, ?)',
+        ['member', 'hash', 'pubkey2', 'privkey2']
+      );
+      memberId = member.lastID;
+
+      // Add admin and member to chat
+      await db.run(
+        'INSERT INTO chat_members (chatId, userId, role) VALUES (?, ?, ?)',
+        [groupChatId, adminId, 'admin']
+      );
+      await db.run(
+        'INSERT INTO chat_members (chatId, userId, role) VALUES (?, ?, ?)',
+        [groupChatId, memberId, 'member']
+      );
+
+      // Add test message
+      const msgRes = await db.run(
+        'INSERT INTO messages (chatId, senderId, content, encryptedContent) VALUES (?, ?, ?, ?)',
+        [groupChatId, memberId, 'Test message', 'encrypted_test_message']
+      );
+      messageId = msgRes.lastID;
+    });
+
+    it('POST /api/chat/:id/moderate - should delete message (admin)', async () => {
+      const res = await request(server)
+        .post(`/api/chat/${groupChatId}/moderate`)
+        .send({
+          action: 'delete',
+          messageId,
+          moderatorId: adminId
+        });
+
+      expect(res.statusCode).toBe(200);
+    });
+
+    it('POST /api/chat/:id/moderate - should ban user (admin)', async () => {
+      const res = await request(server)
+        .post(`/api/chat/${groupChatId}/moderate`)
+        .send({
+          action: 'ban', 
+          userId: memberId,
+          moderatorId: adminId
+        });
+
+      expect(res.statusCode).toBe(200);
+    });
+
+    it('POST /api/chat/:id/moderate - should return 403 for non-admin', async () => {
+      const res = await request(server)
+        .post(`/api/chat/${groupChatId}/moderate`)
+        .send({
+          action: 'delete',
+          messageId,
+          moderatorId: memberId // not admin
+        });
+
+      expect(res.statusCode).toBe(403);
+    });
+
+    it('POST /api/chat/:id/pin - should pin message (admin)', async () => {
+      // Create new message for pin test
+      const pinMsgRes = await db.run(
+        'INSERT INTO messages (chatId, senderId, content, encryptedContent) VALUES (?, ?, ?, ?)',
+        [groupChatId, memberId, 'Pin test message', 'encrypted_pin_test']
+      );
+      
+      const res = await request(server)
+        .post(`/api/chat/${groupChatId}/pin`)
+        .send({
+          messageId: pinMsgRes.lastID,
+          moderatorId: adminId
+        });
+
+      expect(res.statusCode).toBe(200);
+    });
+
+    describe('Group Chat Info', () => {
+      let testGroupId;
+
+      beforeAll(async () => {
+        // Create test users
+        const creator = await db.run(
+          'INSERT INTO users (username, passwordHash, publicKey, privateKey) VALUES (?, ?, ?, ?)',
+          ['info_creator', 'hash1', 'pubkey1', 'privkey1']
+        );
+        creatorId = creator.lastID;
+        
+        const member = await db.run(
+          'INSERT INTO users (username, passwordHash, publicKey, privateKey) VALUES (?, ?, ?, ?)',
+          ['info_member', 'hash2', 'pubkey2', 'privkey2']
+        );
+        member1Id = member.lastID;
+
+        // Create test group
+        const chatRes = await db.run(
+          'INSERT INTO chats (type, name) VALUES (?, ?)',
+          ['group', 'Info Test Group']
+        );
+        testGroupId = chatRes.lastID;
+
+        // Add members
+        await db.run(
+          'INSERT INTO chat_members (chatId, userId, role) VALUES (?, ?, ?)',
+          [testGroupId, creatorId, 'admin']
+        );
+        await db.run(
+          'INSERT INTO chat_members (chatId, userId, role) VALUES (?, ?, ?)',
+          [testGroupId, member1Id, 'member']
+        );
+
+        // Add pinned message
+        const msgRes = await db.run(
+          'INSERT INTO messages (chatId, senderId, content, encryptedContent) VALUES (?, ?, ?, ?)',
+          [testGroupId, creatorId, 'Test pinned message', 'encrypted_pinned']
+        );
+        await db.run(
+          'INSERT INTO pinned_messages (chatId, messageId) VALUES (?, ?)',
+          [testGroupId, msgRes.lastID]
+        );
+      });
+
+      it('GET /api/chat/:id - should return chat info', async () => {
+        const res = await request(server)
+          .get(`/api/chat/${testGroupId}`);
+
+        expect(res.statusCode).toBe(200);
+        expect(res.body).toHaveProperty('id', testGroupId);
+        expect(res.body).toHaveProperty('type', 'group');
+        expect(res.body).toHaveProperty('name', 'Info Test Group');
+        expect(res.body.members).toHaveLength(2);
+        expect(res.body.pinnedMessages).toHaveLength(1);
+      });
+
+      it('GET /api/chat/:id - should return 404 for non-existent chat', async () => {
+        const res = await request(server)
+          .get('/api/chat/999999');
+
+        expect(res.statusCode).toBe(404);
+      });
+    });
+  });
+
   describe('Group Chat API', () => {
     let creatorId, member1Id, member2Id;
 

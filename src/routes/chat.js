@@ -1,5 +1,5 @@
 import express from 'express';
-import { db } from '../server.js';
+import { db, wss } from '../server.js';
 
 const router = express.Router();
 
@@ -163,6 +163,156 @@ router.post('/group', async (req, res) => {
 
   } catch (error) {
     console.error('Ошибка создания группового чата:', error);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// Модерация чата
+router.post('/:id/moderate', async (req, res) => {
+  const { id } = req.params;
+  const { action, messageId, userId, moderatorId } = req.body;
+
+  try {
+    // Проверка прав модератора
+    const moderator = await db.get(
+      'SELECT role FROM chat_members WHERE chatId = ? AND userId = ?',
+      [id, moderatorId]
+    );
+    
+    if (!moderator || moderator.role !== 'admin') {
+      return res.status(403).json({ error: 'Требуются права администратора' });
+    }
+
+    if (action === 'delete' && messageId) {
+      await db.run('DELETE FROM messages WHERE id = ?', [messageId]);
+      
+      // WebSocket событие
+      wss.clients.forEach(client => {
+        if (client.readyState === 1) { // OPEN
+          client.send(JSON.stringify({
+            event: 'message_deleted',
+            data: { chatId: id, messageId }
+          }));
+        }
+      });
+    } 
+    else if (action === 'ban' && userId) {
+      await db.run(
+        'DELETE FROM chat_members WHERE chatId = ? AND userId = ?',
+        [id, userId]
+      );
+      
+      // WebSocket событие
+      wss.clients.forEach(client => {
+        if (client.readyState === 1) { // OPEN
+          client.send(JSON.stringify({
+            event: 'user_banned',
+            data: { chatId: id, userId }
+          }));
+        }
+      });
+    } else {
+      return res.status(400).json({ error: 'Неверное действие' });
+    }
+
+    res.status(200).json({ status: 'Успешно' });
+  } catch (error) {
+    console.error('Ошибка модерации:', error);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// Закрепление сообщения
+router.post('/:id/pin', async (req, res) => {
+  const { id } = req.params;
+  const { messageId, moderatorId } = req.body;
+
+  try {
+    // Проверка прав модератора
+    const moderator = await db.get(
+      'SELECT role FROM chat_members WHERE chatId = ? AND userId = ?',
+      [id, moderatorId]
+    );
+    
+    if (!moderator || moderator.role !== 'admin') {
+      return res.status(403).json({ error: 'Требуются права администратора' });
+    }
+
+    // Проверка существования сообщения
+    const message = await db.get(
+      'SELECT id FROM messages WHERE id = ? AND chatId = ?',
+      [messageId, id]
+    );
+    
+    if (!message) {
+      return res.status(404).json({ error: 'Сообщение не найдено' });
+    }
+
+    // Закрепление сообщения
+    await db.run(
+      'INSERT OR REPLACE INTO pinned_messages (chatId, messageId) VALUES (?, ?)',
+      [id, messageId]
+    );
+
+    // WebSocket событие
+    wss.clients.forEach(client => {
+      if (client.readyState === 1) { // OPEN
+        client.send(JSON.stringify({
+          event: 'message_pinned',
+          data: { chatId: id, messageId }
+        }));
+      }
+    });
+
+    res.status(200).json({ status: 'Сообщение закреплено' });
+  } catch (error) {
+    console.error('Ошибка закрепления сообщения:', error);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// Получение информации о чате
+router.get('/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    // Получаем основную информацию о чате
+    const chat = await db.get(
+      'SELECT id, type, name, createdAt FROM chats WHERE id = ?',
+      [id]
+    );
+    
+    if (!chat) {
+      return res.status(404).json({ error: 'Чат не найден' });
+    }
+
+    // Получаем список участников
+    const members = await db.all(
+      `SELECT u.id, u.username, cm.role 
+       FROM chat_members cm
+       JOIN users u ON cm.userId = u.id
+       WHERE cm.chatId = ?`,
+      [id]
+    );
+
+    // Получаем закрепленные сообщения
+    const pinnedMessages = await db.all(
+      `SELECT pm.messageId, m.content, m.senderId, u.username as senderName
+       FROM pinned_messages pm
+       JOIN messages m ON pm.messageId = m.id
+       JOIN users u ON m.senderId = u.id
+       WHERE pm.chatId = ?`,
+      [id]
+    );
+
+    res.status(200).json({
+      ...chat,
+      members,
+      pinnedMessages
+    });
+
+  } catch (error) {
+    console.error('Ошибка получения информации о чате:', error);
     res.status(500).json({ error: 'Ошибка сервера' });
   }
 });
