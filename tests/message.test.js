@@ -109,8 +109,6 @@ describe('Message API', () => {
   });
 
   it('should emit new_message and message_read WebSocket events', async () => {
-    jest.setTimeout(30000); // Increased timeout to 30 seconds
-    
     const receivedEvents = [];
     const eventPromise = new Promise((resolve) => {
       wsClient.on('message', (data) => {
@@ -149,5 +147,48 @@ describe('Message API', () => {
 
     expect(receivedEvents).toContain('new_message');
     expect(receivedEvents).toContain('message_read');
+  });
+
+  it('GET /api/chat/:id/messages - should return messages with pagination', async () => {
+    // First create some test messages
+    const testMessages = [
+      {content: 'Message 1', timestamp: '2025-03-26T05:00:00Z'},
+      {content: 'Message 2', timestamp: '2025-03-26T05:01:00Z'},
+      {content: 'Message 3', timestamp: '2025-03-26T05:02:00Z'},
+      {content: 'Message 4', timestamp: '2025-03-26T05:03:00Z'},
+      {content: 'Message 5', timestamp: '2025-03-26T05:04:00Z'},
+    ];
+
+    for (const msg of testMessages) {
+      await db.run(
+        'INSERT INTO messages (chatId, senderId, content, encryptedContent, timestamp) VALUES (?, ?, ?, ?, ?)',
+        [chatId, user1Id, msg.content, msg.content, msg.timestamp]
+      );
+    }
+
+    // Test pagination
+    const res1 = await request(app)
+      .get(`/api/chat/${chatId}/messages`)
+      .query({ limit: 2, offset: 0 });
+    
+    expect(res1.statusCode).toBe(200);
+    expect(res1.body).toHaveLength(2);
+    expect(res1.body[0].content).toBe('Message 5'); // Most recent first
+    expect(res1.body[1].content).toBe('Message 4');
+
+    const res2 = await request(app)
+      .get(`/api/chat/${chatId}/messages`)
+      .query({ limit: 2, offset: 2 });
+    
+    expect(res2.statusCode).toBe(200);
+    expect(res2.body).toHaveLength(2);
+    expect(res2.body[0].content).toBe('Message 3');
+    expect(res2.body[1].content).toBe('Message 2');
+
+    // Test invalid chat ID
+    const res3 = await request(app)
+      .get('/api/chat/999/messages');
+    
+    expect(res3.statusCode).toBe(404);
   });
 });

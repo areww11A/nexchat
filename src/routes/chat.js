@@ -69,4 +69,38 @@ router.post('/personal', async (req, res) => {
   }
 });
 
+// Получение сообщений с пагинацией
+router.get('/:id/messages', async (req, res) => {
+  const { id } = req.params;
+  const { limit = 20, offset = 0 } = req.query;
+
+  try {
+    // Проверка существования чата
+    const chatExists = await db.get(
+      'SELECT id FROM chats WHERE id = ?',
+      [id]
+    );
+    
+    if (!chatExists) {
+      return res.status(404).json({ error: 'Чат не найден' });
+    }
+
+    // Получение сообщений (новые первыми)
+    const messages = await db.all(
+      `SELECT m.id, m.senderId, m.content, m.timestamp, u.username 
+       FROM messages m
+       JOIN users u ON m.senderId = u.id
+       WHERE m.chatId = ?
+       ORDER BY m.timestamp DESC
+       LIMIT ? OFFSET ?`,
+      [id, limit, offset]
+    );
+
+    res.status(200).json(messages);
+  } catch (error) {
+    console.error('Ошибка получения сообщений:', error);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
 export default router;
