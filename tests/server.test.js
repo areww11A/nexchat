@@ -165,4 +165,56 @@ describe('Checkpoint Tests', () => {
       });
     });
   });
+
+  describe('Chat API', () => {
+    let user1Id, user2Id;
+
+    beforeAll(async () => {
+      // Create test users
+      await db.run("INSERT INTO users (username, passwordHash, publicKey, privateKey) VALUES ('chatuser1', 'chathash1', 'test_public_key', 'test_private_key')");
+      await db.run("INSERT INTO users (username, passwordHash, publicKey, privateKey) VALUES ('chatuser2', 'chathash2', 'test_public_key', 'test_private_key')");
+      const users = await db.all('SELECT id FROM users');
+      user1Id = users[0].id;
+      user2Id = users[1].id;
+    });
+
+    afterAll(async () => {
+      await db.exec('DELETE FROM chat_members');
+      await db.exec('DELETE FROM chats');
+      await db.exec('DELETE FROM users');
+    });
+
+    it('POST /api/chat/personal - should return 200 on success', async () => {
+      const res = await request(server)
+        .post('/api/chat/personal')
+        .send({ userId1: user1Id, userId2: user2Id });
+      expect(res.statusCode).toBe(200);
+      expect(res.body).toHaveProperty('chatId');
+      expect(typeof res.body.chatId).toBe('number');
+    });
+
+    it('POST /api/chat/personal - should return 400 when creating chat with oneself', async () => {
+      const res = await request(server)
+        .post('/api/chat/personal')
+        .send({ userId1: user1Id, userId2: user1Id });
+      expect(res.statusCode).toBe(400);
+    });
+
+    it('POST /api/chat/personal - should return 409 on duplicate chat', async () => {
+      await request(server)
+        .post('/api/chat/personal')
+        .send({ userId1: user1Id, userId2: user2Id });
+      const res = await request(server)
+        .post('/api/chat/personal')
+        .send({ userId1: user1Id, userId2: user2Id });
+      expect(res.statusCode).toBe(409);
+    });
+
+    it('POST /api/chat/personal - should return 404 if user does not exist', async () => {
+      const res = await request(server)
+        .post('/api/chat/personal')
+        .send({ userId1: 999, userId2: user2Id });
+      expect(res.statusCode).toBe(404);
+    });
+  });
 });

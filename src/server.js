@@ -3,7 +3,11 @@ import dotenv from 'dotenv';
 import { WebSocketServer } from 'ws';
 import sqlite3 from 'sqlite3';
 import { open } from 'sqlite';
+import jwt from 'jsonwebtoken';
 import authRouter from './routes/auth.js';
+
+import messageRouter from './routes/message.js';
+
 
 dotenv.config();
 
@@ -94,6 +98,8 @@ wss.on('connection', (ws, req) => {
 
 // Подключаем роуты
 app.use('/api/auth', authRouter);
+import chatRouter from './routes/chat.js';
+app.use('/api/chat', chatRouter);
 
 // Базовый эндпоинт
 app.get('/', (req, res) => {

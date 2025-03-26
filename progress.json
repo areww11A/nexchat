@@ -1,10 +1,8 @@
 {
   "stage": 1,
-  "substage": "1.1",
-  "checkpoint": "1.1.2",
+  "substage": "1.2",
+  "step": 1,
   "status": "completed",
-  "description": "Реализация авторизации завершена: регистрация и логин работают с использованием bcrypt",
-  "completedAt": "2025-03-25T12:00:00Z",
-  "editedFiles": ["src/routes/auth.js", "src/server.js"],
-  "notes": "libsodium-wrappers заменён на bcrypt из-за проблем с тестовой средой"
+  "description": "API для создания личных чатов реализован и протестирован",
+  "completedAt": "2025-03-26T05:23:26.000Z"
 }
