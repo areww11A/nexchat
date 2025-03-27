@@ -4,15 +4,37 @@ import { WebSocketServer } from 'ws';
 import sqlite3 from 'sqlite3';
 import { open } from 'sqlite';
 import jwt from 'jsonwebtoken';
+import fs from 'fs/promises';
 import authRouter from './routes/auth.js';
 import chatRouter from './routes/chat.js';
 import messageRouter from './routes/message.js';
+import fileRouter from './routes/file.js';
 
 dotenv.config();
 
 const app = express();
-app.use(express.json());
+
+// Увеличиваем лимит для JSON и urlencoded
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Для обработки multipart/form-data (файлов)
+app.use((req, res, next) => {
+  if (req.headers['content-type']?.startsWith('multipart/form-data')) {
+    // Пропускаем обработку express.json для файлов
+    next();
+  } else {
+    express.json()(req, res, next);
+  }
+});
 const port = 3000;
+
+// Создаем папку для загрузок, если не существует
+try {
+  await fs.mkdir('uploads');
+} catch (err) {
+  if (err.code !== 'EEXIST') throw err;
+}
 
 // Инициализация SQLite
 const db = await open({
@@ -20,7 +42,7 @@ const db = await open({
   driver: sqlite3.Database
 });
 
-// Создание таблиц
+// Создание таблиц (остается без изменений)
 await db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -54,6 +76,7 @@ await db.exec(`
     senderId INTEGER NOT NULL,
     content TEXT NOT NULL,
     encryptedContent TEXT NOT NULL,
+    fileUrl TEXT,
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(chatId) REFERENCES chats(id),
     FOREIGN KEY(senderId) REFERENCES users(id)
@@ -109,6 +132,7 @@ wss.on('connection', (ws, req) => {
 app.use('/api/auth', authRouter);
 app.use('/api/chat', chatRouter);
 app.use('/api/message', messageRouter);
+app.use('/api', fileRouter);
 
 // Базовый эндпоинт
 app.get('/', (req, res) => {
