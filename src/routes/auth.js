@@ -2,13 +2,14 @@ import express from 'express';
 import jwt from 'jsonwebtoken';
 import { db } from '../server.js';
 import bcrypt from 'bcrypt';
+import { authenticate } from '../utils/auth.js';
 
 const router = express.Router();
 
 // Улучшенная валидация согласно ТЗ
 const validateRegistration = (username, password) => {
-  if (!username || !/^[a-zA-Z0-9]{3,20}$/.test(username)) {
-    return 'Username must be 3-20 alphanumeric characters';
+  if (!username || !/^[a-zA-Z0-9_]{3,20}$/.test(username)) {
+    return 'Username must be 3-20 characters (letters, numbers, underscores)';
   }
   if (!password || !/^(?=.*[a-zA-Z])(?=.*\d).{6,50}$/.test(password)) {
     return 'Password must be 6-50 characters with at least one letter and one digit';
@@ -99,6 +100,11 @@ router.post('/login', async (req, res) => {
     console.error('Login error:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
+});
+
+// Add verify endpoint for testing
+router.get('/verify', authenticate, (req, res) => {
+  res.status(200).json({ valid: true, userId: req.userId });
 });
 
 export default router;

@@ -8,7 +8,11 @@ import fs from 'fs/promises';
 import authRouter from './routes/auth.js';
 import chatRouter from './routes/chat.js';
 import messageRouter from './routes/message.js';
+import avatarRouter from './routes/avatar.js';
 import fileRouter from './routes/file.js';
+import stickerRouter from './routes/sticker.js';
+import reactionRouter from './routes/reaction.js';
+import notificationRouter from './routes/notification.js';
 
 dotenv.config();
 
@@ -52,6 +56,7 @@ await db.exec(`
     privateKey TEXT NOT NULL,
     transcribeVoice BOOLEAN DEFAULT 0,
     notificationSoundUrl TEXT,
+    avatarUrl TEXT,
     createdAt TEXT DEFAULT CURRENT_TIMESTAMP
   );
 
@@ -59,6 +64,7 @@ await db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     type TEXT CHECK(type IN ('personal', 'group')) NOT NULL,
     name TEXT,
+    avatarUrl TEXT,
     createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
@@ -92,9 +98,10 @@ await db.exec(`
 
   CREATE TABLE IF NOT EXISTS stickers (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    ownerId INTEGER NOT NULL,
-    fileUrl TEXT NOT NULL,
-    FOREIGN KEY(ownerId) REFERENCES users(id)
+    userId INTEGER NOT NULL,
+    path TEXT NOT NULL,
+    createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(userId) REFERENCES users(id)
   );
 
   CREATE TABLE IF NOT EXISTS pinned_messages (
@@ -132,7 +139,17 @@ wss.on('connection', (ws, req) => {
 app.use('/api/auth', authRouter);
 app.use('/api/chat', chatRouter);
 app.use('/api/message', messageRouter);
+app.use('/api', reactionRouter);
+app.use('/api', avatarRouter);
 app.use('/api', fileRouter);
+app.use('/api', (req, res, next) => {
+  req.wss = wss;
+  next();
+}, notificationRouter);
+app.use('/api/file/stickers', (req, res, next) => {
+  req.wss = wss;
+  next();
+}, stickerRouter);
 
 // Базовый эндпоинт
 app.get('/', (req, res) => {
