@@ -1,41 +1,48 @@
 {
-  "name": "nexchat-server",
+  "name": "nexchat",
   "version": "1.0.0",
+  "description": "NexChat - Multiplatform Messenger",
+  "main": "src/server/index.js",
   "type": "module",
-  "main": "src/server.js",
   "scripts": {
-    "start": "node src/server.js",
-    "test": "cross-env NODE_ENV=test node --experimental-vm-modules node_modules/jest/bin/jest.js --forceExit --detectOpenHandles"
+    "start": "node src/server/index.js",
+    "dev": "nodemon src/server/index.js",
+    "migrate": "knex migrate:latest",
+    "postinstall": "node setup.js",
+    "test": "NODE_OPTIONS=--experimental-vm-modules jest --setupFiles dotenv/config",
+    "test:ci": "NODE_ENV=test DB_FILENAME=test_db.sqlite npm run migrate && NODE_OPTIONS=--experimental-vm-modules jest --setupFiles dotenv/config --forceExit"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/areww11A/nexchat.git"
+  },
+  "keywords": [
+    "messenger",
+    "chat",
+    "real-time"
+  ],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/areww11A/nexchat/issues"
+  },
+  "homepage": "https://github.com/areww11A/nexchat#readme",
   "dependencies": {
     "bcrypt": "^5.1.1",
-    "express": "^4.21.2",
-    "ffmpeg-static": "5.1",
+    "express": "^4.18.2",
+    "ffmpeg-static": "^5.2.0",
     "jsonwebtoken": "^9.0.2",
+    "knex": "^3.1.0",
     "libsodium-wrappers": "^0.7.15",
-    "multer": "^1.4.4-lts.1",
-    "sqlite": "^5.1.1",
-    "sqlite3": "5.1",
-    "uuid": "^9.0.1",
-    "ws": "^8.18.1"
+    "sqlite3": "^5.1.7",
+    "ws": "^8.14.2"
   },
   "devDependencies": {
-    "@babel/core": "^7.26.10",
-    "@babel/preset-env": "^7.26.9",
-    "babel-jest": "^29.7.0",
-    "cross-env": "^7.0.3",
+    "@babel/preset-env": "^7.23.2",
+    "@types/jest": "^29.5.8",
     "dotenv": "^16.4.7",
-    "file-type": "^17.1.2",
     "jest": "^29.7.0",
-    "supertest": "^6.3.4"
-  },
-  "jest": {
-    "transform": {
-      "^.+\\.js$": "babel-jest"
-    },
-    "testEnvironment": "node",
-    "transformIgnorePatterns": [
-      "node_modules/(?!(libsodium-wrappers)/)"
-    ]
+    "nodemon": "^3.1.9",
+    "supertest": "^6.3.3"
   }
 }
