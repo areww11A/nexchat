@@ -1,36 +1,17 @@
 {
-  "stage1": {
-    "1.1": {
-      "server_init": true,
-      "auth": {
-        "register": true,
-        "login": true,
-        "recover": true,
-        "password_change": true,
-        "logout": true
-      },
-      "websocket": {
-        "connected": true,
-        "user_online": true,
-        "user_offline": true
-      },
-      "tests": {
-        "auth": true,
-        "last_run": "2025-03-28T06:56:36Z"
-      },
-      "completed": true,
-      "completed_at": "2025-03-28T06:56:36Z"
-    },
-    "1.2": false,
-    "1.3": false,
-    "1.4": false,
-    "1.5": false
-  },
-  "stage2": false,
-  "stage3": false,
-  "stage4": false,
-  "stage5": false,
-  "stage6": false,
-  "stage7": false,
-  "stage8": false
+  "completedStages": [
+    {
+      "stage": "1.5.1",
+      "name": "Avatar system",
+      "completedAt": "2025-03-29T23:24:00Z",
+      "description": "API for user and chat avatars with WebSocket notifications"
+    }
+  ],
+  "currentStage": "1.5.2",
+  "nextStages": [
+    "1.5.2 - Reactions system",
+    "1.5.3 - Voice messages",
+    "1.5.4 - Notification sounds",
+    "1.5.5 - User profile"
+  ]
 }
