@@ -1,22 +1,27 @@
 {
-  "completedStages": [
+  "completed_stages": [
     {
-      "stage": "1.5.1",
-      "name": "Avatar system",
-      "completedAt": "2025-03-29T23:24:00Z",
-      "description": "API for user and chat avatars with WebSocket notifications"
-    },
-    {
-      "stage": "1.5.2",
-      "name": "Reactions system",
-      "completedAt": "2025-03-29T23:28:00Z",
-      "description": "API for message reactions with WebSocket events"
+      "stage": "Auth Service",
+      "status": "completed",
+      "date": "2024-03-28",
+      "details": {
+        "database": "PostgreSQL initialized",
+        "redis": "Connected and working",
+        "websocket": "Server running",
+        "endpoints": {
+          "health": "Working",
+          "register": "Working",
+          "login": "Working",
+          "profile": "Working"
+        },
+        "features": {
+          "validation": "Working",
+          "jwt": "Working",
+          "online_status": "Working"
+        }
+      }
     }
   ],
-  "currentStage": "1.5.3",
-  "nextStages": [
-    "1.5.3 - Voice messages",
-    "1.5.4 - Notification sounds",
-    "1.5.5 - User profile"
-  ]
-}
+  "current_stage": "Chat Service",
+  "next_stage": "Media Service"
+} 
