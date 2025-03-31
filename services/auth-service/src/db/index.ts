@@ -27,7 +27,7 @@ export const getClient = async () => {
 
 export const initDatabase = async () => {
   try {
-    // Создание таблицы users
+    // Создание таблицы users (если не существует)
     await query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -45,9 +45,22 @@ export const initDatabase = async () => {
         show_read_timestamps BOOLEAN DEFAULT false,
         language TEXT DEFAULT 'en',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        recovery_code VARCHAR(6),
+        recovery_code_expires TIMESTAMP,
+        avatar_url TEXT
       );
     `);
+
+    // Добавление отсутствующих колонок (если нужно)
+    try {
+      await query('ALTER TABLE users ADD COLUMN IF NOT EXISTS recovery_code VARCHAR(6)');
+      await query('ALTER TABLE users ADD COLUMN IF NOT EXISTS recovery_code_expires TIMESTAMP');
+      await query('ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT');
+      await query('CREATE INDEX IF NOT EXISTS idx_users_recovery_code ON users(recovery_code)');
+    } catch (error) {
+      console.log('Some columns already exist, continuing...');
+    }
 
     // Создание таблицы sessions
     await query(`
@@ -67,4 +80,4 @@ export const initDatabase = async () => {
     console.error('Error initializing database:', error);
     throw error;
   }
-}; 
+};

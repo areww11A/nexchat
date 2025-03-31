@@ -48,8 +48,13 @@ export const validateLogin = [
 
 export const validatePasswordChange = [
   body('currentPassword')
+    .if(body('recoveryCode').not().exists())
     .notEmpty()
-    .withMessage('Current password is required'),
+    .withMessage('Current password is required when not using recovery code'),
+  body('recoveryCode')
+    .if(body('currentPassword').not().exists())
+    .notEmpty()
+    .withMessage('Recovery code is required when not providing current password'),
   body('newPassword')
     .isLength({ min: 8 })
     .withMessage('Password must be at least 8 characters long')
@@ -91,4 +96,4 @@ export const handleValidationErrors = (req: any, res: any, next: any) => {
     return res.status(400).json({ errors: errors.array() });
   }
   next();
-}; 
+};

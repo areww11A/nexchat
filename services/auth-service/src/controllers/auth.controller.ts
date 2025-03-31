@@ -3,6 +3,8 @@ import { query } from '../db';
 import { generateToken, verifyToken } from '../utils/jwt';
 import { hashPassword, comparePasswords } from '../utils/password';
 import { setSession, deleteSession } from '../redis';
+import { sendRecoveryEmail } from '../utils/email';
+import { generateRecoveryCode } from '../utils/code';
 
 export const register = async (req: Request, res: Response) => {
   try {
@@ -207,4 +209,111 @@ export const changePassword = async (req: Request, res: Response) => {
       error: 'Internal server error',
     });
   }
-}; 
+};
+
+export const checkSchema = async (req: Request, res: Response) => {
+  try {
+    const result = await query(
+      `SELECT column_name 
+       FROM information_schema.columns 
+       WHERE table_name = 'users'`
+    );
+    const columns = result.rows.map(row => row.column_name);
+    res.json({
+      table: 'users',
+      columns: columns,
+      hasRecoveryColumns: columns.includes('recovery_code') && columns.includes('recovery_code_expires'),
+      hasAvatarColumn: columns.includes('avatar_url')
+    });
+  } catch (error) {
+    console.error('Schema check error:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+    });
+  }
+};
+
+export const resetPasswordWithCode = async (req: Request, res: Response) => {
+  try {
+    const { recoveryCode, newPassword } = req.body;
+
+    // Find user with matching recovery code
+    const result = await query(
+      `SELECT id FROM users 
+       WHERE recovery_code = $1 
+       AND recovery_code_expires > NOW()`,
+      [recoveryCode]
+    );
+
+    const user = result.rows[0];
+    if (!user) {
+      return res.status(400).json({
+        error: 'Invalid or expired recovery code',
+      });
+    }
+
+    // Hash new password
+    const passwordHash = await hashPassword(newPassword);
+
+    // Update password and clear recovery code
+    await query(
+      `UPDATE users 
+       SET password_hash = $1,
+           recovery_code = NULL,
+           recovery_code_expires = NULL
+       WHERE id = $2`,
+      [passwordHash, user.id]
+    );
+
+    res.json({
+      message: 'Password reset successfully',
+    });
+  } catch (error) {
+    console.error('Password reset error:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+    });
+  }
+};
+
+export const recoverPassword = async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+
+    // Поиск пользователя
+    const result = await query(
+      'SELECT id FROM users WHERE email = $1',
+      [email]
+    );
+
+    const user = result.rows[0];
+
+    if (!user) {
+      return res.status(404).json({
+        error: 'User not found',
+      });
+    }
+
+    // Генерация кода восстановления
+    const recoveryCode = generateRecoveryCode();
+    const recoveryCodeExpires = new Date(Date.now() + 30 * 60 * 1000); // 30 минут
+
+    // Сохранение кода в базе
+    await query(
+      'UPDATE users SET recovery_code = $1, recovery_code_expires = $2 WHERE id = $3',
+      [recoveryCode, recoveryCodeExpires, user.id]
+    );
+
+    // В тестовом режиме просто возвращаем код
+    res.json({
+      message: 'Recovery code generated (email sending disabled in test mode)',
+      recoveryCode: recoveryCode,
+      expiresAt: recoveryCodeExpires
+    });
+  } catch (error) {
+    console.error('Password recovery error:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+    });
+  }
+};

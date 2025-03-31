@@ -10,6 +10,7 @@ import routes from './routes';
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketManager(server);
+app.set('wsManager', wss);
 
 // Middleware
 app.use(cors(config.cors));
@@ -45,4 +46,4 @@ const startServer = async () => {
   }
 };
 
-startServer(); 
+startServer();

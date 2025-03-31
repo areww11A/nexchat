@@ -21,4 +21,19 @@ export const config = {
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   },
+  email: {
+    host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+    port: parseInt(process.env.EMAIL_PORT || '587'),
+    secure: process.env.EMAIL_SECURE === 'true',
+    user: process.env.EMAIL_USER || '',
+    password: process.env.EMAIL_PASSWORD || '',
+    from: process.env.EMAIL_FROM || 'noreply@nexchat.com',
+  },
+  storage: {
+    region: process.env.STORAGE_REGION || 'us-east-1',
+    accessKeyId: process.env.STORAGE_ACCESS_KEY_ID || '',
+    secretAccessKey: process.env.STORAGE_SECRET_ACCESS_KEY || '',
+    bucket: process.env.STORAGE_BUCKET || 'nexchat-storage',
+    cdnUrl: process.env.STORAGE_CDN_URL || 'https://storage.nexchat.com',
+  },
 }; 
