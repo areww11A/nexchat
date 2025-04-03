@@ -1,0 +1,42 @@
+http:
+  port: 3000
+admin:
+  port: 9876
+  host: localhost
+
+apiEndpoints:
+  auth:
+    host: localhost
+    paths: '/auth/*'
+  status:
+    host: localhost
+    paths: '/status'
+
+serviceEndpoints:
+  authService:
+    url: 'http://localhost:3001'
+  httpbin:
+    url: 'https://httpbin.org'
+
+policies:
+  - proxy
+  - log
+
+pipelines:
+  authPipeline:
+    apiEndpoints:
+      - auth
+    policies:
+      - proxy:
+          - action:
+              serviceEndpoint: authService
+              changeOrigin: true
+
+  default:
+    apiEndpoints:
+      - status
+    policies:
+      - proxy:
+          - action:
+              serviceEndpoint: httpbin
+              changeOrigin: true

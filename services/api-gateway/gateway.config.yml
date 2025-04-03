@@ -1,0 +1,48 @@
+http:
+  port: 3000
+
+admin:
+  port: 9876
+  hostname: localhost
+
+apiEndpoints:
+  auth:
+    host: localhost
+    paths: '/auth/*'
+  chat:
+    host: localhost
+    paths: '/chat/*'
+
+serviceEndpoints:
+  authService:
+    url: 'http://localhost:3001'
+  chatService:
+    url: 'http://localhost:3002'
+
+policies:
+  - basic-auth
+  - cors
+  - expression
+  - key-auth
+  - log
+  - oauth2
+  - proxy
+  - rate-limit
+
+pipelines:
+  authPipeline:
+    apiEndpoints:
+      - auth
+    policies:
+      - proxy:
+          - action:
+              serviceEndpoint: authService
+              changeOrigin: true
+  chatPipeline:
+    apiEndpoints:
+      - chat
+    policies:
+      - proxy:
+          - action:
+              serviceEndpoint: chatService
+              changeOrigin: true

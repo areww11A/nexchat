@@ -1,0 +1,594 @@
+Я подготовлю инструкцию по тестированию функциональности кода для микросервисов NexChat, основываясь на последнем ТЗ. Тесты будут компактными, понятными и охватят все функции каждого сервиса (Auth, Chat, Media, Bot, Echo, Call, Monitoring). Используем supertest для HTTP-запросов и jest для организации тестов, чтобы DeepSeek точно справился. Инструкция будет универсальной для всех сервисов, с примерами кода и акцентом на проверку всех API-методов и WebSocket-событий из ТЗ.
+
+Инструкция по тестированию функциональности микросервисов NexChat
+Общие требования:
+Инструменты: supertest (для HTTP), ws (для WebSocket), jest (тестовый фреймворк).
+Структура: Тесты в /services/<service-name>/tests/, файл <service-name>.test.js.
+Цель: Проверить все API-эндпоинты и WebSocket-события из ТЗ, включая позитивные и негативные сценарии.
+Ограничения: Код теста — до 15-20 строк на проверку одной функции, чтобы оставаться компактным.
+Подготовка:
+Установи зависимости в каждом сервисе:
+bash
+
+Collapse
+
+Wrap
+
+Copy
+npm install --save-dev jest supertest ws
+Настрой package.json:
+json
+
+Collapse
+
+Wrap
+
+Copy
+"scripts": {
+  "test": "jest"
+}
+Создай файл конфигурации jest.config.js в корне сервиса:
+javascript
+
+Collapse
+
+Wrap
+
+Copy
+module.exports = { testEnvironment: 'node' };
+Запусти сервис локально (например, npm start на порту из ТЗ).
+Шаблон теста для сервиса
+Каждый тест включает: запуск запроса, проверку статуса ответа и данных, а также обработку ошибок. WebSocket проверяется отдельно.
+
+Пример структуры теста:
+javascript
+
+Collapse
+
+Wrap
+
+Copy
+const request = require('supertest');
+const WebSocket = require('ws');
+
+const BASE_URL = 'http://localhost:<port>'; // порт из ТЗ
+const wsUrl = 'ws://localhost:<port>';
+
+describe('ServiceName', () => {
+  // HTTP-тест
+  it('should handle <endpoint> success', async () => {
+    const res = await request(BASE_URL)
+      .post('/<endpoint>')
+      .send({ /* данные */ })
+      .set('Authorization', 'Bearer <valid-jwt>');
+    expect(res.status).toBe(200); // или 201
+    expect(res.body).toHaveProperty('<key>');
+  });
+
+  it('should handle <endpoint> error', async () => {
+    const res = await request(BASE_URL)
+      .post('/<endpoint>')
+      .send({ /* неверные данные */ });
+    expect(res.status).toBe(400); // или 401, 403, 404
+  });
+
+  // WebSocket-тест
+  it('should emit <event>', (done) => {
+    const ws = new WebSocket(wsUrl + '?token=<valid-jwt>');
+    ws.on('message', (data) => {
+      const msg = JSON.parse(data);
+      expect(msg.event).toBe('<event>');
+      ws.close();
+      done();
+    });
+    ws.on('open', () => ws.send(JSON.stringify({ action: '<trigger>' })));
+  });
+});
+Тесты по сервисам (на основе последнего ТЗ)
+1. Auth Service (порт 3001)
+javascript
+
+Collapse
+
+Wrap
+
+Copy
+const request = require('supertest');
+const WebSocket = require('ws');
+
+const BASE_URL = 'http://localhost:3001';
+const wsUrl = 'ws://localhost:3001';
+
+describe('Auth Service', () => {
+  it('should register user', async () => {
+    const res = await request(BASE_URL)
+      .post('/auth/register')
+      .send({ username: 'test', password: '123', email: 'test@example.com' });
+    expect(res.status).toBe(201);
+    expect(res.body).toHaveProperty('token');
+  });
+
+  it('should login user', async () => {
+    const res = await request(BASE_URL)
+      .post('/auth/login')
+      .send({ username: 'test', password: '123' });
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('token');
+  });
+
+  it('should recover password', async () => {
+    const res = await request(BASE_URL)
+      .post('/auth/recover')
+      .send({ email: 'test@example.com' });
+    expect(res.status).toBe(200);
+  });
+
+  it('should change password', async () => {
+    const res = await request(BASE_URL)
+      .patch('/auth/password')
+      .set('Authorization', 'Bearer <token>')
+      .send({ newPassword: '1234' });
+    expect(res.status).toBe(200);
+  });
+
+  it('should get user profile', async () => {
+    const res = await request(BASE_URL)
+      .get('/auth/user/1')
+      .set('Authorization', 'Bearer <token>');
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('username');
+  });
+
+  it('should update profile', async () => {
+    const res = await request(BASE_URL)
+      .patch('/auth/profile')
+      .set('Authorization', 'Bearer <token>')
+      .send({ status: 'Hello' });
+    expect(res.status).toBe(200);
+  });
+
+  it('should upload avatar', async () => {
+    const res = await request(BASE_URL)
+      .post('/auth/avatar')
+      .set('Authorization', 'Bearer <token>')
+      .attach('avatar', 'test.jpg');
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('avatarUrl');
+  });
+
+  it('should emit user_online', (done) => {
+    const ws = new WebSocket(wsUrl + '?token=<token>');
+    ws.on('message', (data) => {
+      const msg = JSON.parse(data);
+      expect(msg.event).toBe('user_online');
+      ws.close();
+      done();
+    });
+  });
+});
+2. Chat Service (порт 3002)
+javascript
+
+Collapse
+
+Wrap
+
+Copy
+const request = require('supertest');
+const WebSocket = require('ws');
+
+const BASE_URL = 'http://localhost:3002';
+const wsUrl = 'ws://localhost:3002';
+
+describe('Chat Service', () => {
+  it('should create personal chat', async () => {
+    const res = await request(BASE_URL)
+      .post('/chat/personal')
+      .set('Authorization', 'Bearer <token>')
+      .send({ userId: 2 });
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('chatId');
+  });
+
+  it('should create group chat', async () => {
+    const res = await request(BASE_URL)
+      .post('/chat/group')
+      .set('Authorization', 'Bearer <token>')
+      .send({ name: 'Group', members: [2, 3] });
+    expect(res.status).toBe(200);
+  });
+
+  it('should send message', async () => {
+    const res = await request(BASE_URL)
+      .post('/chat/1/message')
+      .set('Authorization', 'Bearer <token>')
+      .send({ content: 'Hi' });
+    expect(res.status).toBe(200);
+  });
+
+  it('should forward message', async () => {
+    const res = await request(BASE_URL)
+      .post('/chat/1/forward')
+      .set('Authorization', 'Bearer <token>')
+      .send({ messageId: 1, chatId: 2 });
+    expect(res.status).toBe(200);
+  });
+
+  it('should block user', async () => {
+    const res = await request(BASE_URL)
+      .post('/chat/1/block')
+      .set('Authorization', 'Bearer <token>')
+      .send({ userId: 2 });
+    expect(res.status).toBe(200);
+  });
+
+  it('should get blocked users', async () => {
+    const res = await request(BASE_URL)
+      .get('/chat/1/blocked')
+      .set('Authorization', 'Bearer <token>');
+    expect(res.status).toBe(200);
+  });
+
+  it('should add reaction', async () => {
+    const res = await request(BASE_URL)
+      .post('/chat/message/1/reaction')
+      .set('Authorization', 'Bearer <token>')
+      .send({ emoji: '👍' });
+    expect(res.status).toBe(200);
+  });
+
+  it('should get messages', async () => {
+    const res = await request(BASE_URL)
+      .get('/chat/1/messages')
+      .set('Authorization', 'Bearer <token>');
+    expect(res.status).toBe(200);
+  });
+
+  it('should edit message', async () => {
+    const res = await request(BASE_URL)
+      .patch('/chat/message/1')
+      .set('Authorization', 'Bearer <token>')
+      .send({ content: 'Edited' });
+    expect(res.status).toBe(200);
+  });
+
+  it('should delete message', async () => {
+    const res = await request(BASE_URL)
+      .delete('/chat/message/1')
+      .set('Authorization', 'Bearer <token>');
+    expect(res.status).toBe(200);
+  });
+
+  it('should emit new_message', (done) => {
+    const ws = new WebSocket(wsUrl + '?token=<token>');
+    ws.on('message', (data) => {
+      const msg = JSON.parse(data);
+      expect(msg.event).toBe('new_message');
+      ws.close();
+      done();
+    });
+    ws.on('open', () => ws.send(JSON.stringify({ action: 'send_message', chatId: 1 })));
+  });
+});
+3. Media Service (порт 3003)
+javascript
+
+Collapse
+
+Wrap
+
+Copy
+const request = require('supertest');
+const WebSocket = require('ws');
+
+const BASE_URL = 'http://localhost:3003';
+const wsUrl = 'ws://localhost:3003';
+
+describe('Media Service', () => {
+  it('should upload file', async () => {
+    const res = await request(BASE_URL)
+      .post('/media/chat/1/file')
+      .set('Authorization', 'Bearer <token>')
+      .attach('file', 'test.pdf');
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('url');
+  });
+
+  it('should upload voice', async () => {
+    const res = await request(BASE_URL)
+      .post('/media/chat/1/voice')
+      .set('Authorization', 'Bearer <token>')
+      .attach('voice', 'test.mp3');
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('transcription');
+  });
+
+  it('should upload sticker', async () => {
+    const res = await request(BASE_URL)
+      .post('/media/sticker')
+      .set('Authorization', 'Bearer <token>')
+      .attach('sticker', 'test.png');
+    expect(res.status).toBe(200);
+  });
+
+  it('should upload chat avatar', async () => {
+    const res = await request(BASE_URL)
+      .post('/media/chat/1/avatar')
+      .set('Authorization', 'Bearer <token>')
+      .attach('avatar', 'test.jpg');
+    expect(res.status).toBe(200);
+  });
+
+  it('should get file', async () => {
+    const res = await request(BASE_URL)
+      .get('/media/file/1')
+      .set('Authorization', 'Bearer <token>');
+    expect(res.status).toBe(200);
+  });
+
+  it('should get stickers', async () => {
+    const res = await request(BASE_URL)
+      .get('/media/stickers')
+      .set('Authorization', 'Bearer <token>');
+    expect(res.status).toBe(200);
+  });
+
+  it('should upload notification sound', async () => {
+    const res = await request(BASE_URL)
+      .post('/media/user/notification-sound')
+      .set('Authorization', 'Bearer <token>')
+      .attach('sound', 'test.mp3');
+    expect(res.status).toBe(200);
+  });
+
+  it('should emit new_voice', (done) => {
+    const ws = new WebSocket(wsUrl + '?token=<token>');
+    ws.on('message', (data) => {
+      const msg = JSON.parse(data);
+      expect(msg.event).toBe('new_voice');
+      ws.close();
+      done();
+    });
+  });
+});
+4. Bot Service (порт 3004)
+javascript
+
+Collapse
+
+Wrap
+
+Copy
+const request = require('supertest');
+const WebSocket = require('ws');
+
+const BASE_URL = 'http://localhost:3004';
+const wsUrl = 'ws://localhost:3004';
+
+describe('Bot Service', () => {
+  it('should create bot', async () => {
+    const res = await request(BASE_URL)
+      .post('/bot')
+      .set('Authorization', 'Bearer <token>')
+      .send({ name: 'TestBot' });
+    expect(res.status).toBe(200);
+  });
+
+  it('should get bots in chat', async () => {
+    const res = await request(BASE_URL)
+      .get('/bot/chat/1')
+      .set('Authorization', 'Bearer <token>');
+    expect(res.status).toBe(200);
+  });
+
+  it('should add command', async () => {
+    const res = await request(BASE_URL)
+      .post('/bot/1/command')
+      .set('Authorization', 'Bearer <token>')
+      .send({ command: '/start' });
+    expect(res.status).toBe(200);
+  });
+
+  it('should set webhook', async () => {
+    const res = await request(BASE_URL)
+      .post('/bot/1/webhook')
+      .set('Authorization', 'Bearer <token>')
+      .send({ url: 'http://example.com' });
+    expect(res.status).toBe(200);
+  });
+
+  it('should set n8n auth', async () => {
+    const res = await request(BASE_URL)
+      .post('/bot/1/n8n-auth')
+      .set('Authorization', 'Bearer <token>')
+      .send({ token: 'n8n-token' });
+    expect(res.status).toBe(200);
+  });
+
+  it('should emit command_executed', (done) => {
+    const ws = new WebSocket(wsUrl + '?token=<token>');
+    ws.on('message', (data) => {
+      const msg = JSON.parse(data);
+      expect(msg.event).toBe('command_executed');
+      ws.close();
+      done();
+    });
+  });
+});
+5. Echo Service (порт 3005)
+javascript
+
+Collapse
+
+Wrap
+
+Copy
+const request = require('supertest');
+const WebSocket = require('ws');
+
+const BASE_URL = 'http://localhost:3005';
+const wsUrl = 'ws://localhost:3005';
+
+describe('Echo Service', () => {
+  it('should create echo entry', async () => {
+    const res = await request(BASE_URL)
+      .post('/echo')
+      .set('Authorization', 'Bearer <token>')
+      .send({ content: 'Task', chatId: 1 });
+    expect(res.status).toBe(200);
+  });
+
+  it('should get echo entries', async () => {
+    const res = await request(BASE_URL)
+      .get('/echo/chat/1')
+      .set('Authorization', 'Bearer <token>');
+    expect(res.status).toBe(200);
+  });
+
+  it('should delete echo entry', async () => {
+    const res = await request(BASE_URL)
+      .delete('/echo/1')
+      .set('Authorization', 'Bearer <token>');
+    expect(res.status).toBe(200);
+  });
+
+  it('should add vote', async () => {
+    const res = await request(BASE_URL)
+      .post('/echo/1/vote')
+      .set('Authorization', 'Bearer <token>')
+      .send({ value: 1 });
+    expect(res.status).toBe(200);
+  });
+
+  it('should add tag', async () => {
+    const res = await request(BASE_URL)
+      .post('/echo/1/tag')
+      .set('Authorization', 'Bearer <token>')
+      .send({ tag: 'urgent' });
+    expect(res.status).toBe(200);
+  });
+
+  it('should emit echo_created', (done) => {
+    const ws = new WebSocket(wsUrl + '?token=<token>');
+    ws.on('message', (data) => {
+      const msg = JSON.parse(data);
+      expect(msg.event).toBe('echo_created');
+      ws.close();
+      done();
+    });
+  });
+});
+6. Call Service (порт 3006)
+javascript
+
+Collapse
+
+Wrap
+
+Copy
+const request = require('supertest');
+const WebSocket = require('ws');
+
+const BASE_URL = 'http://localhost:3006';
+const wsUrl = 'ws://localhost:3006';
+
+describe('Call Service', () => {
+  it('should start call', async () => {
+    const res = await request(BASE_URL)
+      .post('/call')
+      .set('Authorization', 'Bearer <token>')
+      .send({ userId: 2 });
+    expect(res.status).toBe(200);
+  });
+
+  it('should answer call', async () => {
+    const res = await request(BASE_URL)
+      .post('/call/1/answer')
+      .set('Authorization', 'Bearer <token>');
+    expect(res.status).toBe(200);
+  });
+
+  it('should end call', async () => {
+    const res = await request(BASE_URL)
+      .post('/call/1/end')
+      .set('Authorization', 'Bearer <token>');
+    expect(res.status).toBe(200);
+  });
+
+  it('should enable video', async () => {
+    const res = await request(BASE_URL)
+      .post('/call/1/video')
+      .set('Authorization', 'Bearer <token>')
+      .send({ enabled: true });
+    expect(res.status).toBe(200);
+  });
+
+  it('should join group call', async () => {
+    const res = await request(BASE_URL)
+      .post('/call/group/1/join')
+      .set('Authorization', 'Bearer <token>');
+    expect(res.status).toBe(200);
+  });
+
+  it('should leave call', async () => {
+    const res = await request(BASE_URL)
+      .post('/call/1/leave')
+      .set('Authorization', 'Bearer <token>');
+    expect(res.status).toBe(200);
+  });
+
+  it('should emit call_offer', (done) => {
+    const ws = new WebSocket(wsUrl + '?token=<token>');
+    ws.on('message', (data) => {
+      const msg = JSON.parse(data);
+      expect(msg.event).toBe('call_offer');
+      ws.close();
+      done();
+    });
+  });
+});
+7. Monitoring Service (порт 3007)
+javascript
+
+Collapse
+
+Wrap
+
+Copy
+const request = require('supertest');
+
+const BASE_URL = 'http://localhost:3007';
+
+describe('Monitoring Service', () => {
+  it('should get user devices', async () => {
+    const res = await request(BASE_URL)
+      .get('/monitoring/user/1/devices')
+      .set('Authorization', 'Bearer <admin-token>');
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('devices');
+  });
+
+  it('should get active users in chat', async () => {
+    const res = await request(BASE_URL)
+      .get('/monitoring/chat/1/active')
+      .set('Authorization', 'Bearer <admin-token>');
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('users');
+  });
+
+  it('should deny non-admin access', async () => {
+    const res = await request(BASE_URL)
+      .get('/monitoring/user/1/devices')
+      .set('Authorization', 'Bearer <user-token>');
+    expect(res.status).toBe(403);
+  });
+});
+Запуск тестов
+Убедись, что сервис запущен: npm start.
+Выполни тесты: npm test.
+Проверь отчёт в консоли (пройденные/проваленные тесты).
+Примечания:
+Замени <port> на порт сервиса из ТЗ (3001–3007).
+Используй валидный <token> (получи через /auth/login) и <admin-token> для Monitoring Service.
+Для файлов (avatar, voice, file) создай тестовые файлы (например, test.jpg, test.mp3).
+WebSocket-тесты требуют активного соединения, триггер события зависит от реализации (указано как <trigger>).
