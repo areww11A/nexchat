@@ -31,7 +31,7 @@ export class WebSocketManager {
         return next(new Error('Authentication token is required'));
       }
 
-      const decoded = jwt.verify(token, config.jwt.secret) as { userId: number };
+      const decoded = jwt.verify(token, config.jwtSecret) as { userId: number };
       socket.userId = decoded.userId;
       next();
     } catch (error) {
@@ -91,4 +91,31 @@ export class WebSocketManager {
   public broadcast(event: string, data: any, excludeUserId?: number) {
     this.io.emit(event, data);
   }
-} 
+
+  public notifyReactionAdded(chatId: number, messageId: number, userId: number, emoji: string) {
+    this.sendToChat(chatId, 'reaction_added', {
+      messageId,
+      userId,
+      emoji,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  public notifyReactionRemoved(chatId: number, messageId: number, userId: number, emoji: string) {
+    this.sendToChat(chatId, 'reaction_removed', {
+      messageId,
+      userId,
+      emoji,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  public notifyMessageForwarded(chatId: number, messageId: number, fromChatId: number, userId: number) {
+    this.sendToChat(chatId, 'message_forwarded', {
+      messageId,
+      fromChatId,
+      userId,
+      timestamp: new Date().toISOString()
+    });
+  }
+}

@@ -76,5 +76,31 @@ class MessageModel {
        ORDER BY created_at DESC`, [chatId]);
         return result.rows;
     }
+    static async forwardMessage(messageId, sourceChatId, targetChatId, userId) {
+        const message = await this.getMessageById(messageId);
+        if (!message) {
+            throw new Error('Message not found');
+        }
+        const result = await (0, db_1.query)(`INSERT INTO messages (chat_id, user_id, content, is_forwarded, original_chat_id, original_message_id)
+       VALUES ($1, $2, $3, true, $4, $5)
+       RETURNING *`, [targetChatId, userId, message.content, sourceChatId, messageId]);
+        return result.rows[0];
+    }
+    static async addReaction(messageId, userId, emoji) {
+        const result = await (0, db_1.query)(`INSERT INTO reactions (message_id, user_id, emoji)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (message_id, user_id, emoji) DO NOTHING
+       RETURNING *`, [messageId, userId, emoji]);
+        if (result.rows.length === 0) {
+            throw new Error('Reaction already exists');
+        }
+        return result.rows[0];
+    }
+    static async removeReaction(messageId, userId, emoji) {
+        const result = await (0, db_1.query)(`DELETE FROM reactions
+       WHERE message_id = $1 AND user_id = $2 AND emoji = $3
+       RETURNING id`, [messageId, userId, emoji]);
+        return result.rows.length > 0;
+    }
 }
 exports.MessageModel = MessageModel;

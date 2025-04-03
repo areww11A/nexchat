@@ -19,7 +19,9 @@ class WebSocketManager {
     }
     async authenticate(socket, next) {
         try {
-            const token = socket.handshake.auth.token;
+            logger_1.logger.debug('Auth token:', socket.handshake.auth.token);
+            const token = socket.handshake.auth.token?.split(' ')[1];
+            logger_1.logger.debug('Parsed token:', token);
             if (!token) {
                 return next(new Error('Authentication token is required'));
             }
@@ -73,6 +75,30 @@ class WebSocketManager {
     }
     broadcast(event, data, excludeUserId) {
         this.io.emit(event, data);
+    }
+    notifyReactionAdded(chatId, messageId, userId, emoji) {
+        this.sendToChat(chatId, 'reaction_added', {
+            messageId,
+            userId,
+            emoji,
+            timestamp: new Date().toISOString()
+        });
+    }
+    notifyReactionRemoved(chatId, messageId, userId, emoji) {
+        this.sendToChat(chatId, 'reaction_removed', {
+            messageId,
+            userId,
+            emoji,
+            timestamp: new Date().toISOString()
+        });
+    }
+    notifyMessageForwarded(chatId, messageId, fromChatId, userId) {
+        this.sendToChat(chatId, 'message_forwarded', {
+            messageId,
+            fromChatId,
+            userId,
+            timestamp: new Date().toISOString()
+        });
     }
 }
 exports.WebSocketManager = WebSocketManager;

@@ -266,5 +266,88 @@ class MessageController {
             res.status(500).json({ error: 'Internal server error' });
         }
     }
+    static async forwardMessage(req, res) {
+        try {
+            const { chatId } = req.params;
+            const { userId } = req.user;
+            const { messageId, targetChatId } = req.body;
+            if (!messageId || !targetChatId) {
+                return res.status(400).json({ error: 'Message ID and target chat ID are required' });
+            }
+            const sourceChat = await chat_model_1.ChatModel.getChatById(parseInt(chatId));
+            const targetChat = await chat_model_1.ChatModel.getChatById(parseInt(targetChatId));
+            if (!sourceChat || !targetChat) {
+                return res.status(404).json({ error: 'Chat not found' });
+            }
+            const isSourceMember = await chat_model_1.ChatModel.isUserMemberOfChat(parseInt(chatId), userId);
+            const isTargetMember = await chat_model_1.ChatModel.isUserMemberOfChat(parseInt(targetChatId), userId);
+            if (!isSourceMember || !isTargetMember) {
+                return res.status(403).json({ error: 'Access denied' });
+            }
+            const message = await message_model_1.MessageModel.forwardMessage(parseInt(messageId), parseInt(chatId), parseInt(targetChatId), userId);
+            // Notify both source and target chats
+            req.wsManager.notifyMessageForwarded(parseInt(targetChatId), message.id, parseInt(chatId), userId);
+            res.status(201).json(message);
+        }
+        catch (error) {
+            logger_1.logger.error('Error forwarding message:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    }
+    static async addReaction(req, res) {
+        try {
+            const { messageId } = req.params;
+            const { userId } = req.user;
+            const { emoji } = req.body;
+            if (!emoji || emoji.length > 10) {
+                return res.status(400).json({ error: 'Emoji is required and must be <= 10 chars' });
+            }
+            const message = await message_model_1.MessageModel.getMessageById(parseInt(messageId));
+            if (!message) {
+                return res.status(404).json({ error: 'Message not found' });
+            }
+            const isMember = await chat_model_1.ChatModel.isUserMemberOfChat(message.chatId, userId);
+            if (!isMember) {
+                return res.status(403).json({ error: 'Access denied' });
+            }
+            const reaction = await message_model_1.MessageModel.addReaction(parseInt(messageId), userId, emoji);
+            // Notify chat about new reaction
+            req.wsManager.notifyReactionAdded(message.chatId, parseInt(messageId), userId, emoji);
+            res.status(201).json(reaction);
+        }
+        catch (error) {
+            logger_1.logger.error('Error adding reaction:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    }
+    static async removeReaction(req, res) {
+        try {
+            const { messageId } = req.params;
+            const { userId } = req.user;
+            const { emoji } = req.body;
+            if (!emoji) {
+                return res.status(400).json({ error: 'Emoji is required' });
+            }
+            const message = await message_model_1.MessageModel.getMessageById(parseInt(messageId));
+            if (!message) {
+                return res.status(404).json({ error: 'Message not found' });
+            }
+            const isMember = await chat_model_1.ChatModel.isUserMemberOfChat(message.chatId, userId);
+            if (!isMember) {
+                return res.status(403).json({ error: 'Access denied' });
+            }
+            const removed = await message_model_1.MessageModel.removeReaction(parseInt(messageId), userId, emoji);
+            if (!removed) {
+                return res.status(404).json({ error: 'Reaction not found' });
+            }
+            // Notify chat about removed reaction
+            req.wsManager.notifyReactionRemoved(message.chatId, parseInt(messageId), userId, emoji);
+            res.status(200).json({ message: 'Reaction removed' });
+        }
+        catch (error) {
+            logger_1.logger.error('Error removing reaction:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    }
 }
 exports.MessageController = MessageController;

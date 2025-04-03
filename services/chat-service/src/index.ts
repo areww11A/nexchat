@@ -7,6 +7,7 @@ import { logger } from './utils/logger';
 import { initDatabase } from './db';
 import routes from './routes';
 import { WebSocketManager } from './websocket';
+import { wsMiddleware } from './middleware/ws.middleware';
 
 const app = express();
 const httpServer = createServer(app);
@@ -17,6 +18,9 @@ const io = new Server(httpServer, {
   },
 });
 
+// WebSocket
+const wsManager = new WebSocketManager(io);
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -24,14 +28,13 @@ app.use(express.json());
 // Routes
 app.use('/chat', routes);
 
-// Health check
+// Health check 
 app.get('/health', (req, res) => {
-  logger.info('Health check request received');
-  res.status(200).json({ status: 'ok' });
+  res.status(200).json({ 
+    status: 'ok',
+    service: 'chat'
+  });
 });
-
-// WebSocket
-const wsManager = new WebSocketManager(io);
 
 // Start server
 const startServer = async () => {
@@ -51,4 +54,4 @@ const startServer = async () => {
   }
 };
 
-startServer(); 
+startServer();

@@ -12,6 +12,8 @@ const logger_1 = require("./utils/logger");
 const db_1 = require("./db");
 const routes_1 = __importDefault(require("./routes"));
 const websocket_1 = require("./websocket");
+const ws_middleware_1 = require("./middleware/ws.middleware");
+const auth_middleware_1 = require("./middleware/auth.middleware");
 const app = (0, express_1.default)();
 const httpServer = (0, http_1.createServer)(app);
 const io = new socket_io_1.Server(httpServer, {
@@ -20,18 +22,19 @@ const io = new socket_io_1.Server(httpServer, {
         methods: ['GET', 'POST'],
     },
 });
+// WebSocket
+const wsManager = new websocket_1.WebSocketManager(io);
 // Middleware
 app.use((0, cors_1.default)());
 app.use(express_1.default.json());
+app.use((0, ws_middleware_1.wsMiddleware)(wsManager));
 // Routes
-app.use('/chat', routes_1.default);
+app.use('/chat', auth_middleware_1.authMiddleware, routes_1.default);
 // Health check
 app.get('/health', (req, res) => {
     logger_1.logger.info('Health check request received');
     res.status(200).json({ status: 'ok' });
 });
-// WebSocket
-const wsManager = new websocket_1.WebSocketManager(io);
 // Start server
 const startServer = async () => {
     try {

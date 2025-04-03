@@ -42,7 +42,14 @@ export class ChatController {
       const { chatId } = req.params;
       const { userId } = req.user;
 
-      const chat = await ChatModel.getChatById(parseInt(chatId));
+      if (isNaN(parseInt(chatId))) {
+        return res.status(400).json({ error: 'Invalid chat ID' });
+      }
+
+      const numericChatId = parseInt(chatId);
+      logger.debug(`Getting chat with ID: ${numericChatId}`);
+      
+      const chat = await ChatModel.getChatById(numericChatId);
       if (!chat) {
         return res.status(404).json({ error: 'Chat not found' });
       }
@@ -135,4 +142,4 @@ export class ChatController {
       res.status(500).json({ error: 'Internal server error' });
     }
   }
-} 
+}

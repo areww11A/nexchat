@@ -22,7 +22,7 @@ export const query = async (text: string, params?: any[]) => {
 
 export const initDatabase = async () => {
   try {
-    // Создаем таблицы
+    // Create core tables if not exists
     await query(`
       CREATE TABLE IF NOT EXISTS chats (
         id SERIAL PRIMARY KEY,
@@ -69,9 +69,38 @@ export const initDatabase = async () => {
       CREATE INDEX IF NOT EXISTS idx_blocked_users_user_id ON blocked_users(user_id);
     `);
 
+    // Create migrations table if not exists
+    await query(`
+      CREATE TABLE IF NOT EXISTS migrations (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL UNIQUE,
+        applied_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Get applied migrations
+    const appliedMigrations = await query('SELECT name FROM migrations');
+    const appliedNames = appliedMigrations.rows.map(m => m.name);
+
+    // Scan migrations directory
+    const migrationFiles = [
+      '002_add_reactions_table.sql' // Only need to apply this one
+    ];
+
+    // Apply pending migrations
+    for (const file of migrationFiles) {
+      if (!appliedNames.includes(file)) {
+        logger.info(`Applying migration: ${file}`);
+        const migrationPath = require.resolve(`./migrations/${file}`);
+        const migrationSql = require('fs').readFileSync(migrationPath, 'utf8');
+        await query(migrationSql);
+        await query('INSERT INTO migrations(name) VALUES($1)', [file]);
+      }
+    }
+
     logger.info('Database initialized successfully');
   } catch (error) {
     logger.error('Error initializing database:', error);
     throw error;
   }
-}; 
+};

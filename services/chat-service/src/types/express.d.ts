@@ -1,11 +1,11 @@
-import { Request } from 'express';
+import 'express';
+import { WebSocketManager } from '../websocket';
 
-declare global {
-  namespace Express {
-    interface Request {
-      user: {
-        userId: number;
-      };
-    }
+declare module 'express' {
+  interface Request {
+    user: {
+      userId: number;
+    };
+    wsManager?: WebSocketManager;
   }
-} 
+}

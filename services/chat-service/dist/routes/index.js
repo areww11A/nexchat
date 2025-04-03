@@ -14,6 +14,9 @@ router.delete('/:chatId/block/:userId', auth_middleware_1.authMiddleware, chat_c
 router.get('/:chatId/blocked', auth_middleware_1.authMiddleware, chat_controller_1.ChatController.getBlockedUsers);
 // Message routes
 router.post('/:chatId/message', auth_middleware_1.authMiddleware, message_controller_1.MessageController.sendMessage);
+router.post('/:chatId/forward', auth_middleware_1.authMiddleware, message_controller_1.MessageController.forwardMessage);
+router.post('/message/:messageId/reaction', auth_middleware_1.authMiddleware, message_controller_1.MessageController.addReaction);
+router.delete('/message/:messageId/reaction', auth_middleware_1.authMiddleware, message_controller_1.MessageController.removeReaction);
 router.get('/:chatId/messages', auth_middleware_1.authMiddleware, message_controller_1.MessageController.getMessages);
 router.patch('/message/:messageId', auth_middleware_1.authMiddleware, message_controller_1.MessageController.editMessage);
 router.delete('/message/:messageId', auth_middleware_1.authMiddleware, message_controller_1.MessageController.deleteMessage);

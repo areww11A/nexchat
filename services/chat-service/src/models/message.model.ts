@@ -25,7 +25,12 @@ export class MessageModel {
 
   static async getMessageById(messageId: number): Promise<Message | null> {
     const result = await query(
-      `SELECT * FROM messages WHERE id = $1`,
+      `SELECT id, chat_id as "chatId", user_id as "userId", 
+              content, is_edited as "isEdited", is_deleted as "isDeleted",
+              read_at as "readAt", reply_to_message_id as "replyToMessageId",
+              created_at as "createdAt", updated_at as "updatedAt"
+       FROM messages 
+       WHERE id = $1`,
       [messageId]
     );
     return result.rows[0] || null;
@@ -35,7 +40,7 @@ export class MessageModel {
     const result = await query(
       `UPDATE messages
        SET content = $1, is_edited = true, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $2 AND created_at > NOW() - INTERVAL '24 hours'
+       WHERE id = $2
        RETURNING *`,
       [content, messageId]
     );
@@ -122,4 +127,52 @@ export class MessageModel {
     );
     return result.rows;
   }
-} 
+
+  static async forwardMessage(messageId: number, sourceChatId: number, targetChatId: number, userId: number): Promise<Message> {
+    const message = await this.getMessageById(messageId);
+    if (!message) {
+      throw new Error('Message not found');
+    }
+
+    const result = await query(
+      `INSERT INTO messages (chat_id, user_id, content, is_forwarded, original_chat_id, original_message_id)
+       VALUES ($1, $2, $3, true, $4, $5)
+       RETURNING *`,
+      [targetChatId, userId, message.content, sourceChatId, messageId]
+    );
+    return result.rows[0];
+  }
+
+  static async addReaction(messageId: number, userId: number, emoji: string): Promise<Reaction> {
+    const result = await query(
+      `INSERT INTO reactions (message_id, user_id, emoji)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (message_id, user_id, emoji) DO NOTHING
+       RETURNING *`,
+      [messageId, userId, emoji]
+    );
+    
+    if (result.rows.length === 0) {
+      throw new Error('Reaction already exists');
+    }
+    return result.rows[0];
+  }
+
+  static async removeReaction(messageId: number, userId: number, emoji: string): Promise<boolean> {
+    const result = await query(
+      `DELETE FROM reactions
+       WHERE message_id = $1 AND user_id = $2 AND emoji = $3
+       RETURNING id`,
+      [messageId, userId, emoji]
+    );
+    return result.rows.length > 0;
+  }
+}
+
+interface Reaction {
+  id: number;
+  message_id: number;
+  user_id: number;
+  emoji: string;
+  created_at: Date;
+}
